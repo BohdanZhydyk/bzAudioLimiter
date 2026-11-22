@@ -1,0 +1,41 @@
+'use strict';
+const test=require('node:test');
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const os=require('node:os');
+const path=require('node:path');
+const apo=require('../apo');
+const root=path.join(os.tmpdir(),'bzAudioLimiter-'+process.pid);
+const s={enabled:true,limit:-12,threshold:-24,ratio:'inf',response:'fast'};
+test('install+runtime settings+reinstall+uninstall preserve preexisting APO config and create backup', t=>{
+  fs.mkdirSync(root,{recursive:true});t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+  const main=path.join(root,'config.txt');
+  const text='Preamp: -5 dB\r\nInclude: original.txt\r\n';
+  fs.writeFileSync(main,text);
+  const source=apo.sourceDll(path.resolve(__dirname,'..'),'x64');
+  assert.ok(fs.existsSync(source));
+  assert.equal(apo.install(root,s,source),root);
+  assert.equal(apo.configured(root),true);
+  const master=fs.readFileSync(main,'utf8');
+  assert.ok(master.startsWith(text));
+  assert.equal(master.split(apo.BLOCK_START).length,2);
+  assert.equal(fs.readdirSync(root).filter(n=>n.endsWith('.bak')).length,1);
+  const plugin=fs.readFileSync(path.join(root,'bzAudioLimiter.txt'),'utf8');
+  assert.match(plugin,/"Enabled" 1/);assert.match(plugin,/"Ceiling" 0.76/);
+  apo.install(root,{...s,enabled:false,ratio:'4'},source,true);
+  assert.equal(fs.readFileSync(main,'utf8'),master);
+  assert.match(fs.readFileSync(path.join(root,'bzAudioLimiter.txt'),'utf8'),/"Enabled" 0/);
+  assert.match(fs.readFileSync(path.join(root,'bzAudioLimiter.txt'),'utf8'),/"Ratio" 0.333333/);
+  apo.uninstall(root);
+  assert.equal(fs.readFileSync(main,'utf8'),text);
+  assert.equal(apo.configured(root),false);
+  assert.ok(fs.existsSync(apo.pluginPath(root)));
+});
+test('x86 process on x64 Windows selects 64-bit APO host plugin',()=>{
+  assert.equal(apo.selectedArch({PROCESSOR_ARCHITEW6432:'AMD64'},'ia32'),'x64');
+  assert.equal(apo.selectedArch({PROCESSOR_ARCHITECTURE:'x86'},'ia32'),'x86');
+});
+test('reject invalid Equalizer APO directory and reject broken marker',()=>{
+  assert.throws(()=>apo.configDirectory('/no-such-install'),/config.txt/);
+  assert.throws(()=>apo.installBlock('x\n'+apo.BLOCK_START),/niepełny/);
+});

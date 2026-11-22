@@ -1,0 +1,75 @@
+{
+  "name": "bz-audio-limiter",
+  "version": "0.2.2",
+  "private": true,
+  "description": "System-wide realtime stereo PCM peak limiter via Equalizer APO VST2, Electron UI",
+  "main": "main.js",
+  "scripts": {
+    "dev:web": "vite --host 127.0.0.1 --strictPort",
+    "dev:electron": "electron .",
+    "build": "vite build",
+    "predist:x86": "taskkill /F /IM bzAudioLimiter.exe /T 2>nul & taskkill /F /IM electron.exe /T 2>nul & exit /b 0",
+    "dist:x86": "npm run build && electron-builder --win nsis --ia32 && node -e \"const fs=require('fs'),s='release/bzAudioLimiter-Setup-ia32.exe',d='release/bzAudioLimiter-Setup-x86.exe';if(fs.existsSync(s)){try{fs.unlinkSync(d)}catch{}fs.renameSync(s,d)}\"",
+    "predist:x64": "taskkill /F /IM bzAudioLimiter.exe /T 2>nul & taskkill /F /IM electron.exe /T 2>nul & exit /b 0",
+    "dist:x64": "npm run build && electron-builder --win nsis --x64",
+    "test:integration": "node --test tests/test_apo.test.js tests/test_main.test.js tests/test_limits.test.js tests/test_meter.test.js",
+    "dev": "concurrently -k --names VITE,ELECTRON \"vite --host 127.0.0.1 --strictPort\" \"wait-on tcp:127.0.0.1:5173 && electron .\""
+  },
+  "dependencies": {
+    "electron-store": "^8.2.0",
+    "lucide-react": "^0.263.1",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.2.1",
+    "electron": "22.3.27",
+    "electron-builder": "^24.13.3",
+    "sass": "^1.69.0",
+    "vite": "^4.5.14",
+    "concurrently": "8.2.2",
+    "wait-on": "7.2.0"
+  },
+  "build": {
+    "appId": "com.bzdrive.audiolimiter",
+    "productName": "bzAudioLimiter",
+    "files": [
+      "main.js",
+      "apo.js",
+      "limits.js",
+      "preload.js",
+      "dist/**/*",
+      "public/**/*",
+      "package.json"
+    ],
+    "directories": {
+      "output": "release"
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "public/icon.ico",
+      "requestedExecutionLevel": "requireAdministrator"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": true,
+      "allowToChangeInstallationDirectory": true,
+      "artifactName": "bzAudioLimiter-Setup-${arch}.exe",
+      "createDesktopShortcut": false
+    },
+    "extraResources": [
+      {
+        "from": "native/meter.ps1",
+        "to": "native/meter.ps1"
+      },
+      {
+        "from": "native/bin",
+        "to": "native/bin",
+        "filter": [
+          "**/*.dll"
+        ]
+      }
+    ]
+  },
+  "author": "bzDrive"
+}
